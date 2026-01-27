@@ -1,0 +1,96 @@
+generator client {
+  provider     = "prisma-client"
+  output       = "../generated/prisma"
+  moduleFormat = "cjs"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum TicketDeliveryMethod {
+  DIGITAL_PHOTO
+  DIGITAL_DOWNLOAD
+  PRINTED
+  UNKNOWN
+}
+
+enum TicketStatus {
+  ACTIVE
+  COMPLETED
+  PAID
+  CANCELLED
+}
+
+enum VehicleType {
+  CAR
+  MOTORCYCLE
+  BICYCLE
+}
+
+enum RegistrationSessionStatus {
+  PENDING
+  COMPLETED
+  EXPIRED
+}
+
+model parking_tickets {
+  id               String               @id @default(uuid())
+  qr_token         String               @unique
+  plate_number     String
+  vehicle_type     VehicleType
+  entry_timestamp  DateTime
+  exit_timestamp   DateTime?
+  calculated_fee   Decimal?             @db.Decimal(10, 2)
+  status           TicketStatus         @default(ACTIVE)
+  delivery_method  TicketDeliveryMethod @default(UNKNOWN)
+  delivered        Boolean              @default(false)
+  qr_downloaded_at DateTime?
+  printed_at       DateTime?
+  created_at       DateTime             @default(now())
+  updated_at       DateTime             @updatedAt()
+
+  @@index([delivery_method])
+  @@index([delivered])
+  @@index([entry_timestamp])
+  @@index([plate_number])
+  @@index([qr_token])
+  @@index([status])
+}
+
+model registration_sessions {
+  id             String                     @id @default(uuid())
+  session_token  String                     @unique
+  status         RegistrationSessionStatus  @default(PENDING)
+  ticket_id      String?
+  created_at     DateTime                   @default(now())
+  expires_at     DateTime
+  completed_at   DateTime?
+
+  @@index([session_token])
+  @@index([status])
+  @@index([expires_at])
+}
+
+model pricing_config {
+  id             String      @id @default(uuid())
+  vehicle_type   VehicleType @unique
+  price_per_hour Decimal     @db.Decimal(10, 2)
+  active         Boolean     @default(true)
+  created_at     DateTime    @default(now())
+  updated_at     DateTime    @updatedAt()
+}
+
+model audit_logs {
+  id           String   @id @default(uuid())
+  action       String
+  entity_type  String
+  entity_id    String?
+  performed_by String
+  timestamp    DateTime @default(now())
+  details      String?
+
+  @@index([entity_id])
+  @@index([entity_type])
+  @@index([performed_by])
+}
