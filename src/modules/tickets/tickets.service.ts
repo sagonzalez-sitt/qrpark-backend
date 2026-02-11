@@ -85,6 +85,13 @@ export class TicketsService
             );
         }
 
+        const pricingConfig = await this.pricingService.getPriceByVehicleType(createTicketDto.vehicle_type);
+        if (!pricingConfig) {
+            throw new BadRequestException(
+                `No hay tarifa configurada para el tipo de vehículo ${createTicketDto.vehicle_type}. Configure una tarifa antes de registrar este tipo de vehículo.`
+            );
+        }
+
         const qrToken = this.generateQRToken();
 
         const ticket = await this.prismaService.parking_tickets.create({
@@ -178,15 +185,26 @@ export class TicketsService
     {
         const ticket = await this.findByToken(qrToken);
 
-        if (ticket?.status !== TicketStatus.ACTIVE)
-            throw new BadRequestException(`
-                Ticket with token ${qrToken} is not active and cannot be processed for exit.
-            `);
+        if (!ticket)
+            throw new BadRequestException(`No se encontró un ticket con el token proporcionado.`);
 
-        if (ticket?.exit_timestamp)
-            throw new BadRequestException(`
-                Ticket with token ${qrToken} has already been processed for exit.
-            `);
+        if (ticket.status === TicketStatus.PAID)
+            throw new BadRequestException(`El ticket ya fue pagado.`);
+
+        if (ticket.status === TicketStatus.CANCELLED)
+            throw new BadRequestException(`El ticket fue cancelado y no puede procesarse.`);
+
+        if (ticket?.exit_timestamp && ticket?.calculated_fee)
+        {
+            const durationMs = ticket.exit_timestamp.getTime() - ticket.entry_timestamp.getTime();
+
+            return {
+                ...ticket,
+                duration_ms: durationMs,
+                duration_formatted: formatDuration(durationMs),
+                fee_amount: parseFloat(ticket.calculated_fee.toString()),
+            };
+        }
 
         const exitTimestamp = new Date();
 
@@ -201,7 +219,6 @@ export class TicketsService
             data: {
                 exit_timestamp: exitTimestamp,
                 calculated_fee: calculatedFee,
-                status: TicketStatus.COMPLETED,
             }
         });
 

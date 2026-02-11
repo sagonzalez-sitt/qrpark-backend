@@ -1,4 +1,4 @@
-import {Injectable} from '@nestjs/common';
+import {Injectable, BadRequestException} from '@nestjs/common';
 import {CreatePricingDto} from './dto/create-pricing.dto';
 import {UpdatePricingDto} from './dto/update-pricing.dto';
 import {Decimal} from "@prisma/client/runtime/client";
@@ -14,24 +14,27 @@ export class PricingService
     async calculateFee(vehicleType: VehicleType, entryTime: Date, exitTime: Date): Promise<Decimal>
     {
         const pricingConfig = await this.getPriceByVehicleType(vehicleType);
-        const diffInMs = exitTime.getTime() - entryTime.getTime();
-        const hours = Math.ceil(diffInMs / (1000*60*60));
 
-        return pricingConfig.price_per_hour.mul(hours);
+        if (!pricingConfig) {
+            throw new BadRequestException(
+                `No hay tarifa configurada para el tipo de vehículo ${vehicleType}. No se puede calcular la tarifa.`
+            );
+        }
+
+        const diffInMs = exitTime.getTime() - entryTime.getTime();
+        const minutes = Math.ceil(diffInMs / (1000 * 60));
+
+        const pricePerHour = parseFloat(pricingConfig.price_per_hour.toString());
+        const fee = Math.round((pricePerHour / 60) * minutes);
+
+        return new Decimal(fee);
     }
 
     async getPriceByVehicleType(vehicleType: VehicleType)
     {
-        const priceConfig = await this.prismaService.pricing_config.findUnique({
+        return this.prismaService.pricing_config.findUnique({
             where: { vehicle_type: vehicleType }
         });
-
-        if (!priceConfig)
-        {
-            throw new Error(`No pricing configuration found for vehicle type: ${vehicleType}`);
-        }
-
-        return priceConfig;
     }
 
     async findAll() : Promise<PricingEntity[]>
@@ -66,12 +69,23 @@ export class PricingService
     {
         try
         {
+            const existing = await this.prismaService.pricing_config.findUnique({
+                where: { vehicle_type: data.vehicle_type }
+            });
+
+            if (existing) {
+                throw new BadRequestException(
+                    `Ya existe una configuración de tarifa para el tipo de vehículo ${data.vehicle_type}.`
+                );
+            }
+
             return this.prismaService.pricing_config.create({
                 data: data
             });
         }
         catch (e)
         {
+            if (e instanceof BadRequestException) throw e;
             throw new Error(`Error while creating the pricing config. Message: ${e}` )
         }
     }

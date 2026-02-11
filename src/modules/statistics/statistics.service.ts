@@ -23,7 +23,7 @@ export class StatisticsService
 
         const completedToday = await this.prismaService.parking_tickets.findMany({
             where: {
-                status: TicketStatus.COMPLETED,
+                status: TicketStatus.PAID,
                 exit_timestamp: {
                     gte: startOfDay,
                     lte: endOfDay,
@@ -130,7 +130,7 @@ export class StatisticsService
         });
 
         const completedTickets =
-            tickets.filter((t) => t.status === TicketStatus.COMPLETED);
+            tickets.filter((t) => t.status === TicketStatus.PAID);
 
         const totalRevenue = completedTickets.reduce((sum, ticket) =>
         {

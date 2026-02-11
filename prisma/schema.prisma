@@ -17,7 +17,6 @@ enum TicketDeliveryMethod {
 
 enum TicketStatus {
   ACTIVE
-  COMPLETED
   PAID
   CANCELLED
 }
