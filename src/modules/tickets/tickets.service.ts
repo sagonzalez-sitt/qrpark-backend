@@ -194,18 +194,6 @@ export class TicketsService
         if (ticket.status === TicketStatus.CANCELLED)
             throw new BadRequestException(`El ticket fue cancelado y no puede procesarse.`);
 
-        if (ticket?.exit_timestamp && ticket?.calculated_fee)
-        {
-            const durationMs = ticket.exit_timestamp.getTime() - ticket.entry_timestamp.getTime();
-
-            return {
-                ...ticket,
-                duration_ms: durationMs,
-                duration_formatted: formatDuration(durationMs),
-                fee_amount: parseFloat(ticket.calculated_fee.toString()),
-            };
-        }
-
         const exitTimestamp = new Date();
 
         const calculatedFee = await this.pricingService.calculateFee(
